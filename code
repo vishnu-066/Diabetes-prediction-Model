@@ -1,0 +1,62 @@
+# Install required packages
+install.packages(c("mlbench", "caret", "e1071", "class", "rpart", "cluster"))
+library(mlbench)
+library(caret)
+library(e1071)
+library(class)
+library(rpart)
+library(cluster)
+
+# Load and prepare the dataset
+data("PimaIndiansDiabetes")
+df <- PimaIndiansDiabetes
+
+# Train-test split
+set.seed(123)
+split <- createDataPartition(df$diabetes, p = 0.7, list = FALSE)
+train <- df[split, ]
+test <- df[-split, ]
+
+
+# Normalize for KNN
+normalize <- function(x) { (x - min(x)) / (max(x) - min(x)) }
+df_norm <- as.data.frame(lapply(df[, -9], normalize))
+df_norm$diabetes <- df$diabetes
+
+train_knn <- df_norm[split, ]
+test_knn <- df_norm[-split, ]
+
+
+# KNN
+knn_pred <- knn(train = train_knn[, -9], test = test_knn[, -9], cl = train_knn$diabetes, k = 5)
+knn_result <- confusionMatrix(knn_pred, test_knn$diabetes)
+
+
+# Naive Bayes
+nb_model <- naiveBayes(diabetes ~ ., data = train)
+nb_pred <- predict(nb_model, test)
+nb_result <- confusionMatrix(nb_pred, test$diabetes)
+
+
+# Decision Tree
+dt_model <- rpart(diabetes ~ ., data = train, method = "class")
+dt_pred <- predict(dt_model, test, type = "class")
+dt_result <- confusionMatrix(dt_pred, test$diabetes)
+
+
+# K-Means Clustering (Unsupervised)
+df_kmeans <- scale(df[, -9])
+kmeans_result <- kmeans(df_kmeans, centers = 2)
+table(Cluster = kmeans_result$cluster, Actual = df$diabetes)
+
+
+# Accuracy Summary
+acc_knn <- knn_result$overall['Accuracy']
+acc_nb <- nb_result$overall['Accuracy']
+acc_dt <- dt_result$overall['Accuracy']
+
+accuracy_df <- data.frame(
+  Model = c("KNN", "Naive Bayes", "Decision Tree"),
+  Accuracy = c(acc_knn, acc_nb, acc_dt)
+)
+print(accuracy_df)
